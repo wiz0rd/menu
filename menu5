@@ -1,0 +1,97 @@
+import os
+import sys
+import time
+import getpass
+from datetime import datetime
+from rich.console import Console
+from rich.panel import Panel
+from rich.prompt import Prompt
+from rich.table import Table
+from subprocess import Popen, PIPE
+
+console = Console()
+
+def check_virtual_env():
+    if sys.prefix == sys.base_prefix:
+        console.print(Panel("You have not yet activated the python virtual environment!", style="blink red on black"))
+        sys.exit()
+
+def display(filename, color):
+    with open(filename, 'r') as file:
+        console.print(Panel.fit(file.read(), border_style=color))
+
+def agreement_prompt():
+    while True:
+        console.print(Panel("Type 'Agree' or 'Quit'", style="bold blue on white"))
+        response = Prompt.ask("", choices=["Agree", "Quit"], default="Quit")
+        if response == "Quit":
+            console.print(Panel("Exiting", style="bold red on white"))
+            time.sleep(2)
+            sys.exit()
+        elif response == "Agree":
+            break
+
+def ansible_command_prompt():
+    table = Table(show_header=True, header_style="bold magenta")
+    table.add_column("Option", style="dim", width=12)
+    table.add_column("Description")
+
+    commands = {
+        "1": "Ping localhost",
+        "2": "Get hostname of localhost",
+        # ...
+        "10": "Some other command"
+    }
+
+    for option, description in commands.items():
+        table.add_row(option, description)
+
+    console.print(table)
+
+    while True:
+        response = Prompt.ask("You must press 1-10 or Q", choices=[str(i) for i in range(1, 11)] + ["Q"], default="Q")
+        if response == "Q":
+            console.print(Panel("Exiting", style="bold red on white"))
+            time.sleep(2)
+            sys.exit()
+        else:
+            confirmation_prompt(response)
+
+def confirmation_prompt(command_number):
+    while True:
+        response = Prompt.ask(f"Are you sure you want to run command {command_number}?", choices=["Yes", "No"], default="No")
+        if response == "No":
+            break
+        elif response == "Yes":
+            run_ansible_command(command_number)
+            break
+
+def run_ansible_command(command_number):
+    commands = {
+        "1": ("Ping localhost", "ansible localhost -m ping"),
+        "2": ("Get hostname of localhost", "ansible localhost -m setup -a 'filter=ansible_hostname'"),
+        # ...
+        "10": ("Some other command", "ansible localhost -a 'echo $HOSTNAME'")
+    }
+    description, command = commands.get(command_number, ("", ""))
+    if command:
+        process = Popen(command.split(), stdout=PIPE, stderr=PIPE)
+        stdout, stderr = process.communicate()
+        console.print(f"Output: {stdout.decode()}")
+        if stderr:
+            console.print(f"Error: {stderr.decode()}", style="red")
+        with open(os.path.expanduser('~/.custom_log.txt'), 'a') as log_file:
+            log_file.write(f"{getpass.getuser()},{command_number},{description},{datetime.now()}\n")
+    else:
+        console.print(f"No command found for option {command_number}", style="red")
+
+def main():
+    check_virtual_env()
+    display("logo.txt", "bright_cyan")
+    time.sleep(3)
+    display("banner.txt", "bright_yellow")
+    agreement_prompt()
+    ansible_command_prompt()
+
+if __name__ == "__main__":
+    main()
